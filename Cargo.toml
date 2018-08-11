@@ -1,0 +1,6 @@
+[package]
+name = "catlang"
+version = "0.1.0"
+authors = ["Jani Mustonen <janijohannes@kapsi.fi>"]
+
+[dependencies]
