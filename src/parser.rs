@@ -24,6 +24,9 @@ impl Parser {
             } else if c == '"' {
                 chars.next();
                 self.read_string(&mut chars);
+            } else if c == '\'' {
+                chars.next();
+                self.read_char(&mut chars);
             } else if c.is_digit(10) {
                 self.read_digit(&mut chars)
             } else if self.read_command(&mut chars) {
@@ -79,20 +82,52 @@ impl Parser {
             .push(CatCommand::CreateString(buffer.into_iter().collect()));
     }
 
+    fn read_char<I: Iterator<Item = char>>(&mut self, chars: &mut Peekable<I>) {
+        let c = if let Some(c) = chars.next() {
+            c
+        } else {
+            return;
+        };
+        self.commands.push(CatCommand::CreateString(c.to_string()));
+    }
+
     fn read_command<I: Iterator<Item = char>>(&mut self, chars: &mut Peekable<I>) -> bool {
         let c = if let Some(c) = chars.peek() {
             *c
         } else {
             return false;
         };
+        let mut no_next = false;
         let cmd = match c {
+            '[' => CatCommand::StartBlock,
+            ']' => CatCommand::CloseBlock,
+            '(' => CatCommand::StartBlock,
+            ')' => CatCommand::CloseBlock,
+            '`' => {
+                no_next = true;
+                chars.next();
+                self.read_command(chars);
+                let f = self.commands.pop().unwrap();
+                CatCommand::CreateCommand(Box::new(f))
+            }
             '+' => CatCommand::Add,
             'R' => CatCommand::ReadLine,
             'P' => CatCommand::WriteLine,
+            'M' => CatCommand::Map,
+            'F' => CatCommand::ForEach,
+            '!' => CatCommand::Execute,
+            ':' => CatCommand::ExecuteScoped,
+            'S' => CatCommand::Split,
+            'I' => CatCommand::ToInteger,
             _ => return false,
         };
-        chars.next();
+        if !no_next {
+            chars.next();
+        }
         self.commands.push(cmd);
+        if c == ')' {
+            self.commands.push(CatCommand::ExecuteScoped);
+        }
         return true;
     }
 }
