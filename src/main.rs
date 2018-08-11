@@ -1,19 +1,19 @@
+extern crate clap;
 extern crate itertools;
 
 mod interpreter;
 mod parser;
 mod spec;
 
+use clap::{App, Arg};
 use interpreter::{CatValue::VStack, ExecFrame, Interpreter};
 use parser::Parser;
-use std::env;
+use std::time::Instant;
 
 fn print_frame(frame: ExecFrame, depth: usize) {
     println!(
-        "> {} {: <30} {}{} | Stack before: {: <40} | Stack after: {}",
-        " ".repeat(depth * 2),
-        format!("{:?}", frame.command),
-        " ".repeat(10 - depth * 2),
+        ">  {: <40} {} | Stack before: {: <40} | Stack after: {}",
+        format!("{}{:?}", " ".repeat(depth * 2), frame.command),
         if frame.reading { "(read)" } else { "      " },
         {
             let v = VStack(frame.stack_before).debug_stringify();
@@ -41,24 +41,47 @@ fn print_frame(frame: ExecFrame, depth: usize) {
 }
 
 fn run() -> Result<(), String> {
-    let args: Vec<String> = env::args().collect();
+    let matches = App::new("Catlang")
+        .version("1.0")
+        .author("Jani Mustonen <janijohannes@kapsi.fi>")
+        .about("A simple concatenative golf language")
+        .arg(
+            Arg::with_name("code")
+                .short("c")
+                .long("code")
+                .value_name("CODE")
+                .help("Executes a string directly")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("trace")
+                .short("t")
+                .help("Traces the entire execution"),
+        )
+        .get_matches();
+    let code = matches.value_of("code").unwrap_or("\"Hello, world!\"P");
+    let trace = matches.is_present("trace");
+
     let mut parser = Parser::new();
-    parser.parse(&args[1])?;
-    let mut interpreter = Interpreter::new();
-    for command in parser.commands.iter().cloned() {
-        interpreter.execute_single(command.clone())?;
-        for frame in interpreter.exec_frames.drain(0..) {
-            print_frame(frame, 0);
+    parser.parse(code)?;
+    println!("{:?}", parser.commands.clone());
+    let mut interpreter = Interpreter::new(trace);
+    let now = Instant::now();
+    if trace {
+        for command in parser.commands {
+            interpreter.execute_single(&command)?;
+            for frame in interpreter.exec_frames.drain(0..) {
+                print_frame(frame, 0);
+            }
         }
+    } else {
+        interpreter.execute(parser.commands.into_iter())?;
     }
     interpreter.pop().map(|v| {
-        v.auto_do(|v| -> Result<(), ()> {
-            println!("{}", v.stringify());
-            Ok(())
-        })
+        println!("{}", v.stringify());
     });
-    println!("{:?}", parser);
-    println!("{:?}", interpreter);
+    let elapsed = now.elapsed();
+    println!("{} s {} µs", elapsed.as_secs(), elapsed.subsec_micros());
     Ok(())
 }
 
