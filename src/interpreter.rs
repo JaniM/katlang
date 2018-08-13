@@ -26,7 +26,16 @@ impl CatValue {
     pub fn debug_stringify(&self) -> String {
         match self {
             VInteger(v) => v.to_string(),
-            VString(v) => format!("\"{}\"", v),
+            VString(v) => format!(
+                "\"{}\"",
+                v.chars()
+                    .map(|c| if c == '\n' {
+                        "\\n".to_owned()
+                    } else {
+                        c.to_string()
+                    })
+                    .join("")
+            ),
             VStack(v) => format!("[{}]", v.iter().map(|x| x.debug_stringify()).join(" ")),
             VCommand(v) => format!("{:?}", v),
         }
@@ -106,9 +115,12 @@ impl Interpreter {
     }
 
     #[allow(dead_code)]
-    pub fn execute(&mut self, commands: impl Iterator<Item = CatCommand>) -> Result<(), String> {
+    pub fn execute<'a>(
+        &mut self,
+        commands: impl Iterator<Item = &'a CatCommand>,
+    ) -> Result<(), String> {
         for command in commands {
-            self.execute_single(&command)?;
+            self.execute_single(command)?;
         }
         Ok(())
     }

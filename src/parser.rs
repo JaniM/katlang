@@ -200,9 +200,12 @@ impl Parser {
 
     fn read_command_block<I: Iterator<Item = char>>(&mut self, chars: &mut Peekable<I>) -> bool {
         chars.next();
-        if let Some(c) = chars.peek() {
+        if let Some(&c) = chars.peek() {
             match c {
-                '$' => return true,
+                '$' => {
+                    chars.next();
+                    return true;
+                }
                 ')' => return true,
                 ']' => return true,
                 _ => {}

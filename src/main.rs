@@ -1,14 +1,17 @@
 extern crate clap;
 extern crate itertools;
+extern crate termion;
 
 mod interpreter;
 mod parser;
 mod spec;
+mod term;
 
 use clap::{App, Arg};
 use interpreter::{CatValue::VStack, ExecFrame, Interpreter};
 use parser::Parser;
 use std::time::Instant;
+use term::run_term;
 
 fn print_frame(frame: ExecFrame, depth: usize) {
     println!(
@@ -40,6 +43,30 @@ fn print_frame(frame: ExecFrame, depth: usize) {
         .for_each(|f| print_frame(f, depth + 1));
 }
 
+fn run_snippet(code: &str, trace: bool) -> Result<(), String> {
+    let now = Instant::now();
+    let mut parser = Parser::new();
+    parser.parse(code)?;
+    println!("{:?}", parser.commands.clone());
+    let mut interpreter = Interpreter::new(trace);
+    if trace {
+        for command in parser.commands {
+            interpreter.execute_single(&command)?;
+            for frame in interpreter.exec_frames.drain(0..) {
+                print_frame(frame, 0);
+            }
+        }
+    } else {
+        interpreter.execute(parser.commands.iter())?;
+    }
+    interpreter.pop().map(|v| {
+        println!("{}", v.stringify());
+    });
+    let elapsed = now.elapsed();
+    println!("{} s {} µs", elapsed.as_secs(), elapsed.subsec_micros());
+    Ok(())
+}
+
 fn run() -> Result<(), String> {
     let matches = App::new("Catlang")
         .version("1.0")
@@ -54,34 +81,25 @@ fn run() -> Result<(), String> {
                 .takes_value(true),
         )
         .arg(
+            Arg::with_name("interactive")
+                .short("i")
+                .help("Interactive edit mode"),
+        )
+        .arg(
             Arg::with_name("trace")
                 .short("t")
                 .help("Traces the entire execution"),
         )
         .get_matches();
-    let code = matches.value_of("code").unwrap_or("\"Hello, world!\"P");
+    let code = matches.value_of("code");
     let trace = matches.is_present("trace");
+    let interactive = matches.is_present("interactive");
 
-    let mut parser = Parser::new();
-    parser.parse(code)?;
-    println!("{:?}", parser.commands.clone());
-    let mut interpreter = Interpreter::new(trace);
-    let now = Instant::now();
-    if trace {
-        for command in parser.commands {
-            interpreter.execute_single(&command)?;
-            for frame in interpreter.exec_frames.drain(0..) {
-                print_frame(frame, 0);
-            }
-        }
-    } else {
-        interpreter.execute(parser.commands.into_iter())?;
+    if interactive {
+        run_term()?;
+    } else if let Some(code) = code {
+        run_snippet(code, trace)?;
     }
-    interpreter.pop().map(|v| {
-        println!("{}", v.stringify());
-    });
-    let elapsed = now.elapsed();
-    println!("{} s {} µs", elapsed.as_secs(), elapsed.subsec_micros());
     Ok(())
 }
 
