@@ -12,3 +12,14 @@ Interpreted as: [CreateString("Hello, "), CreateString("Your name: "), Write, Re
 Your name: World
 Hello, World
 ```
+
+## Building
+
+```
+git clone git@github.com:JaniM/katlang.git
+cd katlang
+cargo build --release
+target/release/katlang --help
+```
+
+Be sure to check out the interactive edit mode. ;)

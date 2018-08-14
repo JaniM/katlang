@@ -1,5 +1,5 @@
 [package]
-name = "catlang"
+name = "katlang"
 version = "0.1.0"
 authors = ["Jani Mustonen <janijohannes@kapsi.fi>"]
 
