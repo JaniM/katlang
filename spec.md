@@ -1,5 +1,7 @@
 Katlang is a very simple language, and for the most is executed exactly left-to-right one character at a time. Some constructs alter the order during parsing, which is reflected in the parsed code structure.
 
+Check out the [examples](examples.md)
+
 ## Value types
 
 - Integer: the simplest type, a plain 64-bit signed integer
@@ -67,10 +69,10 @@ Whenever a function is mentioned, it can mean either a quoted builtin or a block
 - `R` (ReadLine): Reads a line from stdin (without the newline) and pushes it to the stack. Errors on EOF.
 - `W` (WriteLine): Pops a value, coerces it to a string and writes it to stdout (with a following newline).
 - `w` (Write): Pops a value, coerces it to a string and writes it to stdout (without a following newline).
-- `M` (Map): Pops a function, and then a value. The value must be a list. Applies the function to each item separately, collecting the top item of the stack after each iteration.
+- `&` (Map): Pops a function, and then a value. The value must be a list. Applies the function to each item separately, collecting the top item of the stack after each iteration.
   - Parsing rule: implicit block
   - Eg. `(1 2 3)M1+2*` -> `(4 6 8)`
-- `F` (ForEach): Same as map, but does not collect the values.
+- `@` (ForEach): Same as map, but does not collect the values.
   - Parsing rule: implicit block
   - Eg. `(1 2 3)FW` -> empty stack, but prints each value on separate lines
   - Eg. `0(1 2 3)F+` -> `6`

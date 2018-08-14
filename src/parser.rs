@@ -165,14 +165,14 @@ impl Parser {
             'R' => CatCommand::ReadLine,
             'W' => CatCommand::WriteLine,
             'w' => CatCommand::Write,
-            'M' => {
+            '&' => {
                 if !self.read_command_block(chars) {
                     return false;
                 }
                 no_next = true;
                 CatCommand::Map
             }
-            'F' => {
+            '@' => {
                 if !self.read_command_block(chars) {
                     return false;
                 }

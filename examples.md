@@ -1,3 +1,5 @@
+Check out the [spec](spec.md)
+
 - Fibonacci sequence
 
   `1:50#p;+x$~ J`
