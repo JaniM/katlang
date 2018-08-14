@@ -10,6 +10,7 @@ enum ReadResult {
 #[derive(Debug)]
 pub struct Parser {
     pub commands: Vec<CatCommand>,
+    pub known_variables: Vec<char>,
     whitespace_needed: bool,
 }
 
@@ -17,6 +18,7 @@ impl Parser {
     pub fn new() -> Parser {
         Parser {
             commands: vec![],
+            known_variables: vec![],
             whitespace_needed: false,
         }
     }
@@ -27,7 +29,10 @@ impl Parser {
             match self.read_one(&mut chars, &[]) {
                 ReadResult::Ok => {}
                 ReadResult::NoMatch(_) => {
-                    return Err(format!("Unexpected character: {}", chars.peek().unwrap()))
+                    return match chars.peek() {
+                        Some(c) => Err(format!("Unexpected character: {}", c)),
+                        None => Err(format!("Unexpected EOF")),
+                    }
                 }
                 ReadResult::Done => return Ok(()),
             }
@@ -66,6 +71,14 @@ impl Parser {
         } else if c.is_digit(10) {
             self.read_digit(chars)
         } else if self.read_command(chars) {
+        } else if c == '{' {
+            self.read_named_block(chars);
+        } else if c == '$' {
+            return ReadResult::NoMatch(c);
+        } else if self.known_variables.contains(&c) {
+            self.commands.push(CatCommand::PopVariable(c, true));
+            chars.next();
+        } else if self.read_pre_named_block(chars) {
         } else {
             return ReadResult::NoMatch(c);
         }
@@ -186,6 +199,25 @@ impl Parser {
             'P' => CatCommand::PopSide,
             '~' => CatCommand::ConsumeSide,
             'J' => CatCommand::Join,
+            '>' => {
+                chars.next();
+                match chars.peek() {
+                    Some(c) => {
+                        if !self.known_variables.contains(c) {
+                            self.known_variables.push(*c);
+                        }
+                        CatCommand::PushVariable(*c)
+                    }
+                    None => return false,
+                }
+            }
+            '<' => {
+                chars.next();
+                match chars.peek() {
+                    Some(c) => CatCommand::PopVariable(*c, false),
+                    None => return false,
+                }
+            }
             _ => return false,
         };
         if !no_next {
@@ -208,14 +240,70 @@ impl Parser {
                 }
                 ')' => return true,
                 ']' => return true,
+                '}' => return true,
                 _ => {}
             }
         }
         self.commands.push(CatCommand::StartBlock);
         loop {
-            match self.read_one(chars, &[')', ']']) {
+            match self.read_one(chars, &[')', ']', '}']) {
                 ReadResult::Ok => {}
                 ReadResult::NoMatch('$') => {
+                    chars.next();
+                    break;
+                }
+                ReadResult::NoMatch(')') => break,
+                ReadResult::NoMatch(']') => break,
+                ReadResult::NoMatch('}') => break,
+                ReadResult::NoMatch(_) => return false,
+                ReadResult::Done => break,
+            }
+        }
+        self.commands.push(CatCommand::CloseBlock);
+        true
+    }
+
+    fn read_named_block<I: Iterator<Item = char>>(&mut self, chars: &mut Peekable<I>) -> bool {
+        chars.next();
+        self.commands.push(CatCommand::StartBlock);
+        loop {
+            match self.read_one(chars, &['}']) {
+                ReadResult::Ok => {}
+                ReadResult::NoMatch('}') => {
+                    chars.next();
+                    break;
+                }
+                ReadResult::NoMatch(_) => return false,
+                ReadResult::Done => break,
+            }
+        }
+        self.commands.push(CatCommand::CloseBlock);
+        let name = match chars.next() {
+            Some(c) => c,
+            None => return false,
+        };
+        self.commands.push(CatCommand::PushVariable(name));
+        if !self.known_variables.contains(&name) {
+            self.known_variables.push(name);
+        }
+        true
+    }
+
+    fn read_pre_named_block<I: Iterator<Item = char>>(&mut self, chars: &mut Peekable<I>) -> bool {
+        let name = match chars.next() {
+            Some(c) => c,
+            None => return false,
+        };
+        let cmd_pos = self.commands.len();
+        self.commands.push(CatCommand::StartBlock);
+        loop {
+            match self.read_one(chars, &[')', ']', '}']) {
+                ReadResult::Ok => {}
+                ReadResult::NoMatch('$') => {
+                    chars.next();
+                    break;
+                }
+                ReadResult::NoMatch('}') => {
                     chars.next();
                     break;
                 }
@@ -226,6 +314,15 @@ impl Parser {
             }
         }
         self.commands.push(CatCommand::CloseBlock);
+        self.commands.push(CatCommand::PushVariable(name));
+        {
+            let prec = self.commands.drain(cmd_pos..).collect::<Vec<_>>();
+            self.commands.splice(0..0, prec);
+        }
+        self.commands.push(CatCommand::PopVariable(name, true));
+        if !self.known_variables.contains(&name) {
+            self.known_variables.push(name);
+        }
         true
     }
 }

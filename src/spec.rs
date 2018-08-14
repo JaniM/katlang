@@ -27,4 +27,6 @@ pub enum CatCommand {
     PopSide,
     ConsumeSide,
     Join,
+    PushVariable(char),
+    PopVariable(char, bool),
 }

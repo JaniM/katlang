@@ -1,5 +1,6 @@
 use itertools::Itertools;
 use spec::CatCommand;
+use std::collections::HashMap;
 use std::io::{self, BufRead, Write};
 use std::mem;
 
@@ -95,6 +96,7 @@ pub struct Interpreter {
     pub exec_frames: Vec<ExecFrame>,
     pub main_stack: Vec<CatValue>,
     pub side_stack: Vec<CatValue>,
+    pub variables: HashMap<char, CatValue>,
     block_stack: Option<Vec<CatValue>>,
     block_depth: i64,
     collect_frame_pos: usize,
@@ -106,6 +108,7 @@ impl Interpreter {
         Interpreter {
             main_stack: Vec::new(),
             side_stack: Vec::new(),
+            variables: HashMap::new(),
             block_stack: None,
             block_depth: 0,
             exec_frames: vec![],
@@ -235,11 +238,8 @@ impl Interpreter {
                 };
                 let mut results = Vec::new();
                 for val in values {
-                    self.collect_frame(|this| -> Result<(), String> {
-                        this.push(val);
-                        this.execute_value(&func)?;
-                        Ok(())
-                    })?;
+                    self.push(val);
+                    self.execute_value(&func)?;
                     let result = self.pop_res()?;
                     if let VStack(mut s) = result {
                         if s.len() == 1 {
@@ -258,7 +258,7 @@ impl Interpreter {
                 let values = match self.pop_res()? {
                     VStack(v) => v,
                     VString(v) => v.chars().map(|c| VString(c.to_string())).collect(),
-                    _ => return Err("Map parameter isn't a stack or a string".to_owned()),
+                    _ => return Err("ForEach parameter isn't a stack or a string".to_owned()),
                 };
                 for val in values {
                     self.push(val);
@@ -305,6 +305,7 @@ impl Interpreter {
                 let val = self.main_stack.last_mut().ok_or_else(|| "Empty stack")?;
                 *val = match val {
                     VStack(ref v) => VString(v.iter().map(|x| x.stringify()).join(&separator)),
+                    VString(ref v) => VString(v.chars().join(&separator)),
                     _ => return Err("Join parameter isn't a stack".to_owned()),
                 };
             }
@@ -358,6 +359,26 @@ impl Interpreter {
                 let mut new_stack = Vec::new();
                 mem::swap(&mut new_stack, &mut self.side_stack);
                 self.push(VStack(new_stack));
+            }
+            &CatCommand::PushVariable(c) => {
+                let item = self.pop_res()?;
+                self.variables.insert(c, item);
+            }
+            &CatCommand::PopVariable(c, execute) => {
+                let item = self
+                    .variables
+                    .get(&c)
+                    .ok_or_else(|| "Fetched from an empty variable")?
+                    .clone();
+                if execute {
+                    match item {
+                        VCommand(_) => self.execute_value(&item)?,
+                        VStack(_) => self.execute_value(&item)?,
+                        _ => self.push(item),
+                    }
+                } else {
+                    self.push(item);
+                }
             }
         };
         Ok(())

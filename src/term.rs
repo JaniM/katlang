@@ -39,20 +39,22 @@ pub fn run_term() -> Result<(), String> {
                     cursorpos -= 1;
                 }
             }
-            Key::Alt(c) => println!("Alt-{}", c),
-            Key::Ctrl(c) => println!("Ctrl-{}", c),
             Key::Left => {
                 if cursorpos > 0 {
                     cursorpos -= 1;
                 }
+                write!(stdout, "{}", cursor::Goto(3 + cursorpos as u16, 2),).unwrap();
+                stdout.flush().unwrap();
+                continue;
             }
             Key::Right => {
                 if cursorpos < code.len() {
                     cursorpos += 1;
                 }
+                write!(stdout, "{}", cursor::Goto(3 + cursorpos as u16, 2),).unwrap();
+                stdout.flush().unwrap();
+                continue;
             }
-            Key::Up => println!("<up>"),
-            Key::Down => println!("<down>"),
             _ => println!("Other"),
         }
 
@@ -122,10 +124,10 @@ pub fn run_term() -> Result<(), String> {
                 cursor::Goto(1, 5 + i as u16),
                 cmd.map(|x| format!("{:?}", x)).unwrap_or("".to_owned()),
                 stack_item
-                    .map(|x| x.debug_stringify().chars().take(30).join(""))
+                    .map(|x| x.debug_stringify().chars().take(40).join(""))
                     .unwrap_or("".to_owned()),
                 side_item
-                    .map(|x| x.debug_stringify().chars().take(30).join(""))
+                    .map(|x| x.debug_stringify().chars().take(40).join(""))
                     .unwrap_or("".to_owned())
             ).unwrap()
         }
